@@ -19,3 +19,7 @@ htmlcov/
 *.egg-info/
 .cache/
 data/
+
+# bibvet output artifacts
+report.md
+*.fixed.bib
