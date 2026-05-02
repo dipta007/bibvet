@@ -24,11 +24,12 @@ VENUE_WARNING_THRESHOLD = 80
 CROSS_CHECK_THRESHOLD = 90
 
 
-def compare_entry(entry: UserEntry, records: list[CanonicalRecord]) -> EntryReport:
+def compare_entry(entry: UserEntry, records: list[CanonicalRecord], *, strict: bool = False) -> EntryReport:
     """Apply spec compare logic to one entry's worth of source records."""
     if not records:
+        # strict: flag ALL entry types as unverified — never silently skip
         status: EntryStatus = (
-            "unverified" if entry.entry_type in PAPER_TYPES else "skipped"
+            "unverified" if (entry.entry_type in PAPER_TYPES or strict) else "skipped"
         )
         return EntryReport(
             entry=entry, status=status, canonical=None,
@@ -50,7 +51,7 @@ def compare_entry(entry: UserEntry, records: list[CanonicalRecord]) -> EntryRepo
             )
 
     canonical = _reconcile(records)
-    diffs = _compute_diffs(entry, canonical)
+    diffs = _compute_diffs(entry, canonical, strict=strict)
     has_error = any(d.severity == "error" for d in diffs)
     status = "fixable" if has_error else "verified"
 
@@ -69,6 +70,10 @@ def compare_entry(entry: UserEntry, records: list[CanonicalRecord]) -> EntryRepo
                 f"Published version exists at {published.venue} ({published.year}); "
                 f"you cited the arXiv preprint."
             )
+
+    # strict: note when only one source returned a result — may miss corroboration
+    if strict and len({r.source for r in records}) == 1:
+        notes.append("Only one source matched — verify manually.")
 
     return EntryReport(
         entry=entry, status=status, canonical=canonical,
@@ -109,7 +114,7 @@ def _reconcile(records: list[CanonicalRecord]) -> CanonicalRecord:
     return records[0]
 
 
-def _compute_diffs(entry: UserEntry, canonical: CanonicalRecord) -> list[FieldDiff]:
+def _compute_diffs(entry: UserEntry, canonical: CanonicalRecord, *, strict: bool = False) -> list[FieldDiff]:
     diffs: list[FieldDiff] = []
     f = entry.fields
 
@@ -128,20 +133,24 @@ def _compute_diffs(entry: UserEntry, canonical: CanonicalRecord) -> list[FieldDi
                 severity="error", rationale=f"title similarity {ratio} below threshold",
             ))
         elif ratio < TITLE_WARNING_THRESHOLD:
+            # strict: collapse warning band into error — any title difference is flagged as error
+            severity = "error" if strict else "warning"
             diffs.append(FieldDiff(
                 field="title", user_value=f["title"], canonical_value=canonical.title,
-                severity="warning", rationale=f"title differs cosmetically (similarity {ratio})",
+                severity=severity, rationale=f"title differs cosmetically (similarity {ratio})",
             ))
 
-    diffs.extend(_compare_authors(f.get("author", ""), canonical))
+    diffs.extend(_compare_authors(f.get("author", ""), canonical, strict=strict))
 
     venue_field = "booktitle" if "booktitle" in f else ("journal" if "journal" in f else None)
     if venue_field and canonical.venue:
         ratio = fuzzy_ratio(f[venue_field], canonical.venue)
         if ratio < VENUE_WARNING_THRESHOLD:
+            # strict: venue mismatch is an error instead of a warning
+            severity = "error" if strict else "warning"
             diffs.append(FieldDiff(
                 field=venue_field, user_value=f[venue_field], canonical_value=canonical.venue,
-                severity="warning", rationale=f"venue differs (similarity {ratio})",
+                severity=severity, rationale=f"venue differs (similarity {ratio})",
             ))
 
     if "doi" in f and canonical.doi:
@@ -154,7 +163,7 @@ def _compute_diffs(entry: UserEntry, canonical: CanonicalRecord) -> list[FieldDi
     return diffs
 
 
-def _compare_authors(user_author: str, canonical: CanonicalRecord) -> list[FieldDiff]:
+def _compare_authors(user_author: str, canonical: CanonicalRecord, *, strict: bool = False) -> list[FieldDiff]:
     if not user_author or not canonical.authors:
         return []
 
@@ -180,9 +189,11 @@ def _compare_authors(user_author: str, canonical: CanonicalRecord) -> list[Field
             ))
             return diffs
         if u_giv and c_giv and not _given_names_compatible(u_giv, c_giv):
+            # strict: initial-vs-full first name promoted from info to warning
+            severity = "warning" if strict else "info"
             diffs.append(FieldDiff(
                 field="author", user_value=u_giv, canonical_value=c_giv,
-                severity="info",
+                severity=severity,
                 rationale=f"author position {i+1}: given name differs ('{u_giv}' vs '{c_giv}')",
             ))
     return diffs

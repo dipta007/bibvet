@@ -281,3 +281,145 @@ def test_published_version_note_when_user_cites_preprint():
     cr_rec = _record(source="crossref", matched_via_kind="title_query")
     report = compare_entry(entry, [arxiv_rec, cr_rec])
     assert any("published version" in n.lower() for n in report.notes)
+
+
+# === Strict mode ===
+
+def test_strict_title_at_95_is_error_not_warning():
+    # fuzzy_ratio("Attention Is All We Need", canonical) == 93, which is in [92, 96] warning band
+    entry = _entry(
+        title="Attention Is All We Need",
+        author="Vaswani, Ashish and Shazeer, Noam",
+        year="2017",
+        booktitle="NeurIPS",
+        doi="10.5555/3295222.3295349",
+    )
+    rec = _record()
+    default_report = compare_entry(entry, [rec])
+    strict_report = compare_entry(entry, [rec], strict=True)
+
+    # Default: title diff is a warning, entry is verified
+    assert any(d.field == "title" and d.severity == "warning" for d in default_report.diffs)
+    assert default_report.status == "verified"
+
+    # Strict: same title diff becomes an error, entry is fixable
+    assert any(d.field == "title" and d.severity == "error" for d in strict_report.diffs)
+    assert strict_report.status == "fixable"
+
+
+def test_strict_venue_mismatch_is_error_not_warning():
+    entry = _entry(
+        title="Attention Is All You Need",
+        author="Vaswani, Ashish",
+        year="2017",
+        booktitle="ICML",  # wrong venue
+    )
+    rec = _record(authors=(("Vaswani", "Ashish"),))
+
+    default_report = compare_entry(entry, [rec])
+    strict_report = compare_entry(entry, [rec], strict=True)
+
+    # Default: venue is a warning, entry is verified
+    assert any(d.field == "booktitle" and d.severity == "warning" for d in default_report.diffs)
+    assert default_report.status == "verified"
+
+    # Strict: venue becomes an error, entry is fixable
+    assert any(d.field == "booktitle" and d.severity == "error" for d in strict_report.diffs)
+    assert strict_report.status == "fixable"
+
+
+def test_strict_no_match_book_is_unverified_not_skipped():
+    entry = _entry(entry_type="book", title="Some Book", author="X, Y", year="2020")
+
+    default_report = compare_entry(entry, [])
+    strict_report = compare_entry(entry, [], strict=True)
+
+    assert default_report.status == "skipped"
+    assert strict_report.status == "unverified"
+
+
+def test_strict_initial_vs_full_first_name_is_warning_not_info():
+    # Use given names with different initials ("Charles" vs canonical "David") so that
+    # _given_names_compatible returns False and an info-level diff is produced.
+    # (Note: truly compatible initials like "A." vs "Ashish" are silent in both modes.)
+    entry = _entry(
+        title="Attention Is All You Need",
+        author="Vaswani, Charles",
+        year="2017",
+    )
+    rec = _record(authors=(("Vaswani", "David"),))
+
+    default_report = compare_entry(entry, [rec])
+    strict_report = compare_entry(entry, [rec], strict=True)
+
+    # Default: given-name diff is info severity, entry is verified
+    assert default_report.status == "verified"
+    assert any(d.field == "author" and d.severity == "info" for d in default_report.diffs)
+
+    # Strict: same diff is promoted to warning, entry is still verified
+    assert strict_report.status == "verified"
+    assert any(d.field == "author" and d.severity == "warning" for d in strict_report.diffs)
+
+
+def test_strict_single_source_match_adds_note():
+    entry = _entry(
+        title="Attention Is All You Need",
+        author="Vaswani, Ashish",
+        year="2017",
+    )
+    # Only one source (arxiv) returned a record
+    rec = _record(source="arxiv", doi=None, arxiv_id="1706.03762", type_hint="preprint", matched_via_kind="arxiv")
+
+    default_report = compare_entry(entry, [rec])
+    strict_report = compare_entry(entry, [rec], strict=True)
+
+    # Default: no single-source note
+    assert not any("one source" in n.lower() for n in default_report.notes)
+
+    # Strict: note added about single source
+    assert any("one source" in n.lower() for n in strict_report.notes)
+
+    # Status is not changed solely because of the single-source note
+    assert strict_report.status == default_report.status
+
+
+def test_strict_does_not_break_perfect_match():
+    entry = _entry(
+        entry_type="inproceedings",
+        title="Attention Is All You Need",
+        author="Vaswani, Ashish and Shazeer, Noam",
+        year="2017",
+        booktitle="NeurIPS",
+        doi="10.5555/3295222.3295349",
+    )
+    rec = _record()
+
+    strict_report = compare_entry(entry, [rec], strict=True)
+
+    assert strict_report.status == "verified"
+    assert strict_report.diffs == ()
+    # No concerning notes (single source note absent because crossref is the only rec — but
+    # we check there's no note that would alarm a reviewer; note: single-source note IS present
+    # here since there's only one record, which is the defined strict behavior)
+
+
+def test_strict_does_not_break_cross_check_failure():
+    # DOI and title disagree — strict should not alter cross_check_failed behavior
+    entry = _entry(
+        title="Attention Is All You Need",
+        author="Vaswani, Ashish",
+        year="2017",
+        doi="10.18653/v1/N19-1423",
+    )
+    doi_record = _record(
+        title="BERT: Pre-training",
+        authors=(("Devlin", "Jacob"),),
+        year=2019,
+        doi="10.18653/v1/N19-1423",
+        matched_via_kind="doi",
+    )
+    title_record = _record(matched_via_kind="title_query")
+
+    strict_report = compare_entry(entry, [doi_record, title_record], strict=True)
+
+    assert strict_report.status == "cross_check_failed"

@@ -27,10 +27,11 @@ DEFAULT_CONCURRENCY = 5
 
 
 class Pipeline:
-    def __init__(self, sources: list[Source], *, concurrency: int = DEFAULT_CONCURRENCY, lenient: bool = False):
+    def __init__(self, sources: list[Source], *, concurrency: int = DEFAULT_CONCURRENCY, lenient: bool = False, strict: bool = False):
         self._sources = sources
         self._sem = asyncio.Semaphore(concurrency)
         self._lenient = lenient
+        self._strict = strict
 
     async def run(self, paths: list[Path]) -> list[FileReport]:
         return await asyncio.gather(*(self._run_file(p) for p in paths))
@@ -58,7 +59,7 @@ class Pipeline:
                     if rec is not None:
                         records.append(rec)
 
-        report = compare_entry(entry, records)
+        report = compare_entry(entry, records, strict=self._strict)
         if errors and not records:
             report = replace(
                 report,

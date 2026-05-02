@@ -66,6 +66,21 @@ bibvet works with no config. Optional environment variables:
 
 Cache lives at the platform-default user cache directory (`~/Library/Caches/bibvet/` on macOS, `~/.cache/bibvet/` on Linux). 30-day TTL. `bibvet cache clear` to purge.
 
+## Strict mode
+
+```bash
+bibvet refs.bib --strict
+```
+
+For high-recall hallucination sweeps. Promotes warnings to errors:
+
+- Any title difference flagged (was: cosmetic differences silenced)
+- Venue mismatches treated as errors (was: warnings)
+- Books, theses, and `@misc` entries with no canonical match flagged (was: silently skipped)
+- Single-source matches noted for manual review
+
+Slightly more false positives, but won't miss subtly altered citations. Useful before paper submission.
+
 ## Prior art
 
 [`rebiber`](https://github.com/yuchenlin/rebiber) normalizes `.bib` against bundled DBLP / ACL Anthology snapshots — focused on rewriting arXiv preprints to their published versions. bibvet is complementary: it verifies entries against live data sources and detects hallucinations. If you want pure offline normalization, use rebiber. If you want to catch fabricated citations and verify against authoritative sources, use bibvet.

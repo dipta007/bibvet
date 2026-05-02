@@ -86,6 +86,7 @@ def _build_parser() -> argparse.ArgumentParser:
     p.add_argument("--verbose", "-v", action="store_true", help="show verified entries too")
     p.add_argument("--explain", metavar="CITEKEY", help="show detailed report for one citekey")
     p.add_argument("--lenient", action="store_true", help="skip malformed entries instead of failing")
+    p.add_argument("--strict", action="store_true", help="promote warnings to errors and flag entries from single-source matches")
     p.add_argument("--no-cache", action="store_true", help="bypass the disk cache")
     p.add_argument("--debug", action="store_true", help="show full tracebacks on errors")
     return p
@@ -124,7 +125,7 @@ async def _run(paths: list[Path], args) -> int:
         sources = [CrossRefSource(http, cache), SemanticScholarSource(http, cache), ArxivSource(http, cache)]
         for s in sources:
             s.http = http
-        pipeline = Pipeline(sources=sources, lenient=args.lenient)
+        pipeline = Pipeline(sources=sources, lenient=args.lenient, strict=args.strict)
         path_args = await _resolve_stdin(paths)
         file_reports = await pipeline.run(path_args)
 

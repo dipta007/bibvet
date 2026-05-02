@@ -120,3 +120,48 @@ def test_force_required_to_overwrite_fixed(tmp_path):
         rc = cli_main([str(bib), "--fix", "--force"])
     assert rc == 2
     assert "2017" in fixed.read_text()
+
+
+def _patch_pipeline_strict(records_for: dict[str, CanonicalRecord | None]):
+    """Patch Pipeline._run_entry to pass self._strict through to compare_entry."""
+    from bibvet import pipeline as pipeline_mod
+
+    async def fake_run_entry(self, entry):
+        from bibvet.compare import compare_entry
+        rec = records_for.get(entry.citekey)
+        records = [rec] if rec else []
+        return compare_entry(entry, records, strict=self._strict)
+
+    return patch.object(pipeline_mod.Pipeline, "_run_entry", fake_run_entry)
+
+
+# A bib whose only diff under default is a venue warning
+VENUE_WARN_BIB = """\
+@inproceedings{vwarn, title = {Attention Is All You Need},
+author = {Vaswani, Ashish}, year = {2017}, booktitle = {ICML}}
+"""
+
+
+def _venue_warn_record():
+    return CanonicalRecord(
+        source="crossref", matched_via=LookupKey(kind="doi", value="x"),
+        title="Attention Is All You Need",
+        authors=(Author(family="Vaswani", given="Ashish"),),
+        year=2017, venue="NeurIPS", doi="10.5555/3295222.3295349",
+        arxiv_id=None, entry_type_hint="proceedings-article", raw={},
+    )
+
+
+def test_strict_flag_exits_2_when_default_would_exit_1(tmp_path):
+    bib = tmp_path / "refs.bib"
+    bib.write_text(VENUE_WARN_BIB)
+
+    # Without --strict: venue mismatch is only a warning → exit 1
+    with _patch_pipeline_strict({"vwarn": _venue_warn_record()}):
+        rc_default = cli_main([str(bib)])
+    assert rc_default == 1
+
+    # With --strict: venue warning is promoted to error → exit 2
+    with _patch_pipeline_strict({"vwarn": _venue_warn_record()}):
+        rc_strict = cli_main([str(bib), "--strict"])
+    assert rc_strict == 2
