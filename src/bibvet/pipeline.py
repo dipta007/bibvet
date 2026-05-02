@@ -27,7 +27,14 @@ DEFAULT_CONCURRENCY = 5
 
 
 class Pipeline:
-    def __init__(self, sources: list[Source], *, concurrency: int = DEFAULT_CONCURRENCY, lenient: bool = False, strict: bool = False):
+    def __init__(
+        self,
+        sources: list[Source],
+        *,
+        concurrency: int = DEFAULT_CONCURRENCY,
+        lenient: bool = False,
+        strict: bool = False,
+    ):
         self._sources = sources
         self._sem = asyncio.Semaphore(concurrency)
         self._lenient = lenient
