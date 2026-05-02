@@ -13,14 +13,13 @@ jobs:
         python-version: ["3.11", "3.12", "3.13"]
     steps:
       - uses: actions/checkout@v4
-      - uses: astral-sh/setup-uv@v3
+      - uses: astral-sh/setup-uv@v4
         with:
           enable-cache: true
-      - name: set up python ${{ matrix.python-version }}
-        run: uv python install ${{ matrix.python-version }}
-      - name: install
-        run: uv sync --all-extras --python ${{ matrix.python-version }}
+          python-version: ${{ matrix.python-version }}
+      - name: install (with dev extras)
+        run: uv sync --extra dev
       - name: lint
-        run: uv run ruff check src tests
+        run: uvx ruff check src tests
       - name: test
         run: uv run pytest -v --cov=bibvet --cov-report=term-missing
