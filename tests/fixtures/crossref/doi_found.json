@@ -1,0 +1,15 @@
+{
+  "status": "ok",
+  "message-type": "work",
+  "message": {
+    "DOI": "10.5555/3295222.3295349",
+    "title": ["Attention Is All You Need"],
+    "author": [
+      {"family": "Vaswani", "given": "Ashish"},
+      {"family": "Shazeer", "given": "Noam"}
+    ],
+    "issued": {"date-parts": [[2017]]},
+    "type": "proceedings-article",
+    "container-title": ["Advances in Neural Information Processing Systems"]
+  }
+}

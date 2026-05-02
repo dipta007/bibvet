@@ -1,0 +1,16 @@
+{
+  "status": "ok",
+  "message-type": "work-list",
+  "message": {
+    "items": [
+      {
+        "DOI": "10.5555/3295222.3295349",
+        "title": ["Attention Is All You Need"],
+        "author": [{"family": "Vaswani", "given": "Ashish"}],
+        "issued": {"date-parts": [[2017]]},
+        "type": "proceedings-article",
+        "container-title": ["NeurIPS"]
+      }
+    ]
+  }
+}
