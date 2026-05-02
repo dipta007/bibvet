@@ -129,9 +129,51 @@ async def _run(paths: list[Path], args) -> int:
         sources = [CrossRefSource(http, cache), SemanticScholarSource(http, cache), ArxivSource(http, cache)]
         for s in sources:
             s.http = http
-        pipeline = Pipeline(sources=sources, lenient=args.lenient, strict=args.strict)
         path_args = await _resolve_stdin(paths)
-        file_reports = await pipeline.run(path_args)
+
+        # Set up progress bar (only if format is terminal and stderr is a tty).
+        from rich.console import Console
+        from rich.progress import (
+            BarColumn,
+            MofNCompleteColumn,
+            Progress,
+            SpinnerColumn,
+            TextColumn,
+            TimeElapsedColumn,
+        )
+
+        progress_console = Console(stderr=True)
+        show_progress = args.format == "terminal" and progress_console.is_terminal
+
+        if show_progress:
+            counter = Pipeline(
+                sources=sources, lenient=args.lenient, strict=args.strict
+            )
+            total = counter.total_entries(path_args)
+            with Progress(
+                SpinnerColumn(),
+                TextColumn("[progress.description]{task.description}"),
+                BarColumn(),
+                MofNCompleteColumn(),
+                TimeElapsedColumn(),
+                console=progress_console,
+                transient=True,
+            ) as progress:
+                task_id = progress.add_task("verifying citations", total=total)
+
+                def _on_done(entry, report):
+                    progress.advance(task_id)
+
+                pipeline = Pipeline(
+                    sources=sources,
+                    lenient=args.lenient,
+                    strict=args.strict,
+                    on_entry_done=_on_done,
+                )
+                file_reports = await pipeline.run(path_args)
+        else:
+            pipeline = Pipeline(sources=sources, lenient=args.lenient, strict=args.strict)
+            file_reports = await pipeline.run(path_args)
 
     if args.explain:
         file_reports = _filter_explain(file_reports, args.explain)

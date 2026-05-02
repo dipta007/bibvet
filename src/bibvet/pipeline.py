@@ -7,6 +7,7 @@ from __future__ import annotations
 
 import asyncio
 import logging
+from collections.abc import Callable
 from dataclasses import replace
 from pathlib import Path
 
@@ -21,6 +22,8 @@ from bibvet.parser import parse_bib_file
 from bibvet.resolve import resolve_lookup_keys
 from bibvet.sources.base import Source
 
+ProgressCallback = Callable[[UserEntry, EntryReport], None]
+
 logger = logging.getLogger(__name__)
 
 DEFAULT_CONCURRENCY = 5
@@ -34,14 +37,26 @@ class Pipeline:
         concurrency: int = DEFAULT_CONCURRENCY,
         lenient: bool = False,
         strict: bool = False,
+        on_entry_done: ProgressCallback | None = None,
     ):
         self._sources = sources
         self._sem = asyncio.Semaphore(concurrency)
         self._lenient = lenient
         self._strict = strict
+        self._on_entry_done = on_entry_done
 
     async def run(self, paths: list[Path]) -> list[FileReport]:
         return await asyncio.gather(*(self._run_file(p) for p in paths))
+
+    def total_entries(self, paths: list[Path]) -> int:
+        """Pre-count entries across all paths so callers can size a progress bar."""
+        total = 0
+        for p in paths:
+            try:
+                total += len(parse_bib_file(p, lenient=self._lenient))
+            except Exception:
+                pass
+        return total
 
     async def _run_file(self, path: Path) -> FileReport:
         entries = parse_bib_file(path, lenient=self._lenient)
@@ -73,4 +88,9 @@ class Pipeline:
                 status="unverified",
                 notes=tuple(report.notes) + tuple(errors),
             )
+        if self._on_entry_done is not None:
+            try:
+                self._on_entry_done(entry, report)
+            except Exception:
+                logger.warning("progress callback raised; ignoring", exc_info=True)
         return report
