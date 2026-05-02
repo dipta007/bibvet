@@ -11,20 +11,61 @@ from bibvet.normalize import normalize_doi, normalize_string
 
 _ARXIV_PREFIX_RE = re.compile(r"^\s*arxiv:\s*", re.IGNORECASE)
 
+# Match modern arXiv ID (YYMM.NNNNN) and old-style (cs/0701001 etc).
+_ARXIV_ID_RE = re.compile(
+    r"(?:arxiv[:\s]*)?(\d{4}\.\d{4,5}|[a-z\-]+/\d{7})",
+    re.IGNORECASE,
+)
+# arXiv-style DOI: 10.48550/arXiv.<id>
+_ARXIV_DOI_RE = re.compile(r"10\.48550/arXiv\.(\S+)", re.IGNORECASE)
+
+
+def _extract_arxiv_id(entry_fields: dict[str, str]) -> str | None:
+    """Find an arXiv ID anywhere it commonly appears: eprint, journal, doi, note, url."""
+    eprint = entry_fields.get("eprint", "").strip()
+    archive = entry_fields.get("archiveprefix", "").lower()
+    if eprint:
+        cleaned = _ARXIV_PREFIX_RE.sub("", eprint).strip()
+        if archive == "arxiv" or eprint.lower().startswith("arxiv:"):
+            return cleaned
+        # Some entries have a bare arXiv ID in eprint with no archiveprefix.
+        if _ARXIV_ID_RE.fullmatch(cleaned):
+            return cleaned
+
+    # arXiv-style DOI (preprint with no other DOI assigned).
+    doi = entry_fields.get("doi", "")
+    if doi:
+        m = _ARXIV_DOI_RE.search(doi)
+        if m:
+            return m.group(1).strip()
+
+    # Common Google-Scholar export: journal = "arXiv preprint arXiv:2005.00085"
+    # Also: url = "http://arxiv.org/abs/2204.02311", note = "arXiv:2204.02311 [cs]"
+    for field in ("journal", "note", "url", "howpublished"):
+        value = entry_fields.get(field, "")
+        if not value or "arxiv" not in value.lower():
+            continue
+        # Find the first arXiv-shaped ID anywhere in the value.
+        m = _ARXIV_ID_RE.search(value)
+        if m:
+            return m.group(1)
+
+    return None
+
 
 def resolve_lookup_keys(entry: UserEntry) -> list[LookupKey]:
     keys: list[LookupKey] = []
     fields = entry.fields
 
     if doi := fields.get("doi"):
-        keys.append(LookupKey(kind="doi", value=normalize_doi(doi), extras={}))
+        # Skip DOI lookup for arXiv-style DOIs — they resolve to arXiv anyway,
+        # so the arxiv key (extracted below) is a better hit.
+        if not _ARXIV_DOI_RE.search(doi):
+            keys.append(LookupKey(kind="doi", value=normalize_doi(doi), extras={}))
 
-    eprint = fields.get("eprint", "")
-    archive = fields.get("archiveprefix", "").lower()
-    if eprint:
-        cleaned = _ARXIV_PREFIX_RE.sub("", eprint).strip()
-        if archive == "arxiv" or eprint.lower().startswith("arxiv:"):
-            keys.append(LookupKey(kind="arxiv", value=cleaned, extras={}))
+    arxiv_id = _extract_arxiv_id(fields)
+    if arxiv_id:
+        keys.append(LookupKey(kind="arxiv", value=arxiv_id, extras={}))
 
     title = fields.get("title", "").strip()
     if len(title) >= 5:
