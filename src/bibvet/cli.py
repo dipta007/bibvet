@@ -177,10 +177,12 @@ async def _run(paths: list[Path], args) -> int:
                 MofNCompleteColumn(),
                 TimeElapsedColumn(),
                 console=progress_console,
-                transient=True,
+                transient=False,
+                refresh_per_second=20,
             ) as progress:
                 entry_task = progress.add_task("entries verified", total=total_entries)
                 fetch_task = progress.add_task("api calls", total=total_fetches_est)
+                progress.refresh()  # render once immediately so even fast runs show the bar
 
                 def _on_entry(entry, report):
                     progress.advance(entry_task)
