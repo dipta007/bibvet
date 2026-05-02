@@ -15,11 +15,9 @@ from bibvet.models import (
     CanonicalRecord,
     EntryReport,
     FileReport,
-    LookupKey,
     UserEntry,
 )
 from bibvet.parser import parse_bib_file
-from bibvet.normalize import normalize_string
 from bibvet.resolve import resolve_lookup_keys
 from bibvet.sources.base import Source
 
@@ -45,8 +43,6 @@ class Pipeline:
     async def _run_entry(self, entry: UserEntry) -> EntryReport:
         async with self._sem:
             keys = resolve_lookup_keys(entry)
-            if not keys:
-                keys = _fallback_keys(entry)
             records: list[CanonicalRecord] = []
             errors: list[str] = []
             for key in keys:
@@ -70,33 +66,3 @@ class Pipeline:
                 notes=tuple(report.notes) + tuple(errors),
             )
         return report
-
-
-def _fallback_keys(entry: UserEntry) -> list[LookupKey]:
-    """Generate a minimal title_query key even for very short titles."""
-    title = entry.fields.get("title", "").strip()
-    if not title:
-        return []
-    author = entry.fields.get("author", "")
-    first_author = _first_author_lastname(author)
-    year_str = entry.fields.get("year", "").strip()
-    try:
-        year = int(year_str)
-    except (TypeError, ValueError):
-        year = 0
-    return [LookupKey(
-        kind="title_query",
-        value=normalize_string(title),
-        extras={"first_author": first_author, "year": year},
-    )]
-
-
-def _first_author_lastname(author_field: str) -> str:
-    if not author_field:
-        return ""
-    first = author_field.split(" and ")[0].strip()
-    if "," in first:
-        last = first.split(",", 1)[0].strip()
-    else:
-        last = first.split()[-1] if first else ""
-    return normalize_string(last)

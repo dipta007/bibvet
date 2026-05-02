@@ -40,9 +40,9 @@ async def test_pipeline_runs_entry_through_all_stages(tmp_path):
 @pytest.mark.asyncio
 async def test_pipeline_handles_multiple_files(tmp_path):
     a = tmp_path / "a.bib"
-    a.write_text("@article{a, title = {T}, author = {X, Y}, year = {2020}, journal = {J}}")
+    a.write_text("@article{a, title = {Some Paper}, author = {X, Y}, year = {2020}, journal = {J}}")
     b = tmp_path / "b.bib"
-    b.write_text("@article{b, title = {T2}, author = {X, Y}, year = {2021}, journal = {J}}")
+    b.write_text("@article{b, title = {Other Paper}, author = {X, Y}, year = {2021}, journal = {J}}")
 
     fake = AsyncMock()
     fake.name = "crossref"
@@ -57,7 +57,7 @@ async def test_pipeline_handles_multiple_files(tmp_path):
 @pytest.mark.asyncio
 async def test_per_entry_fetch_failure_marks_unverified(tmp_path):
     bib = tmp_path / "refs.bib"
-    bib.write_text("@article{x, title = {T}, author = {X, Y}, year = {2020}, journal = {J}}")
+    bib.write_text("@article{x, title = {Some Paper}, author = {X, Y}, year = {2020}, journal = {J}}")
 
     fake = AsyncMock()
     fake.name = "crossref"
