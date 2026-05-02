@@ -2,7 +2,6 @@ import asyncio
 
 import httpx
 import pytest
-import respx
 
 from bibvet.http import HttpClient, TerminalNegative
 

@@ -1,10 +1,6 @@
-import json
 import time
-from pathlib import Path
 
-import pytest
-
-from bibvet.cache import DiskCache, CACHE_SCHEMA_VERSION
+from bibvet.cache import CACHE_SCHEMA_VERSION, DiskCache
 
 
 def test_miss_returns_none(tmp_path):
@@ -41,7 +37,6 @@ def test_corrupted_file_self_heals(tmp_path):
 
 def test_schema_version_invalidates(tmp_path):
     cache = DiskCache(tmp_path)
-    files_dir = tmp_path / f"v{CACHE_SCHEMA_VERSION}"
     cache.set("crossref", "10.1/abc", {"x": 1})
     new_cache = DiskCache(tmp_path, schema_version=CACHE_SCHEMA_VERSION + 1)
     assert new_cache.get("crossref", "10.1/abc") is None

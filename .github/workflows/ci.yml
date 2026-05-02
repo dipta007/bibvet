@@ -1,0 +1,26 @@
+name: ci
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.11", "3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v3
+        with:
+          enable-cache: true
+      - name: set up python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+      - name: install
+        run: uv sync --all-extras --python ${{ matrix.python-version }}
+      - name: lint
+        run: uv run ruff check src tests
+      - name: test
+        run: uv run pytest -v --cov=bibvet --cov-report=term-missing

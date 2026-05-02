@@ -1,9 +1,8 @@
-from pathlib import Path
 from unittest.mock import AsyncMock
 
 import pytest
 
-from bibvet.models import Author, CanonicalRecord, LookupKey, UserEntry
+from bibvet.models import Author, CanonicalRecord, LookupKey
 from bibvet.pipeline import Pipeline
 
 

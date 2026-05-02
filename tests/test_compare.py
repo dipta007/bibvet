@@ -2,7 +2,7 @@ from pathlib import Path
 
 import pytest
 
-from bibvet.compare import compare_entry, PAPER_TYPES, NON_PAPER_TYPES
+from bibvet.compare import NON_PAPER_TYPES, PAPER_TYPES, compare_entry
 from bibvet.models import Author, CanonicalRecord, LookupKey, UserEntry
 
 

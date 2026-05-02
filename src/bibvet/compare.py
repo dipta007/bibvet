@@ -170,7 +170,7 @@ def _compare_authors(user_author: str, canonical: CanonicalRecord) -> list[Field
         )]
 
     diffs: list[FieldDiff] = []
-    for i, ((u_fam, u_giv), (c_fam, c_giv)) in enumerate(zip(user_list, canonical_list)):
+    for i, ((u_fam, u_giv), (c_fam, c_giv)) in enumerate(zip(user_list, canonical_list, strict=True)):
         if normalize_string(u_fam) != normalize_string(c_fam):
             diffs.append(FieldDiff(
                 field="author", user_value=user_author,

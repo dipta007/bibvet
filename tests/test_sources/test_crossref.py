@@ -2,7 +2,6 @@ import json
 from pathlib import Path
 
 import pytest
-import respx
 
 from bibvet.cache import DiskCache
 from bibvet.http import HttpClient

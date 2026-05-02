@@ -4,7 +4,12 @@ from pathlib import Path
 from rich.console import Console
 
 from bibvet.models import (
-    Author, CanonicalRecord, EntryReport, FieldDiff, FileReport, LookupKey, UserEntry,
+    CanonicalRecord,
+    EntryReport,
+    FieldDiff,
+    FileReport,
+    LookupKey,
+    UserEntry,
 )
 from bibvet.render.terminal import render_terminal
 

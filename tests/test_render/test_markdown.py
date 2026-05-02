@@ -1,7 +1,10 @@
 from pathlib import Path
 
 from bibvet.models import (
-    Author, CanonicalRecord, EntryReport, FieldDiff, FileReport, LookupKey, UserEntry,
+    EntryReport,
+    FieldDiff,
+    FileReport,
+    UserEntry,
 )
 from bibvet.render.markdown import render_markdown
 

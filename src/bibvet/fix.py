@@ -36,7 +36,7 @@ def write_fixed_bib(
 
     chunks: list[str] = []
     blocks = _split_into_blocks(original_text, [er.entry for er in report.entries])
-    for er, block in zip(report.entries, blocks):
+    for er, block in zip(report.entries, blocks, strict=True):
         chunks.append(_render_entry(er, block))
     out_path.write_text("\n\n".join(chunks).strip() + "\n", encoding="utf-8")
 
@@ -45,7 +45,8 @@ def _render_entry(er: EntryReport, original_block: str) -> str:
     if er.status == "fixable" and er.canonical is not None:
         return _rewrite_with_canonical(er.entry, er.canonical)
     if er.status == "unverified":
-        return f"% bibvet: UNVERIFIED — no high-confidence match in any source; manual review required\n{original_block}"
+        msg = "UNVERIFIED — no high-confidence match in any source; manual review required"
+        return f"% bibvet: {msg}\n{original_block}"
     if er.status == "cross_check_failed":
         note = "; ".join(er.notes) if er.notes else "DOI and title-search disagree"
         return f"% bibvet: CROSS-CHECK FAILED — {note}; manual review required\n{original_block}"

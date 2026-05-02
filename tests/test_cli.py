@@ -1,10 +1,7 @@
 """End-to-end CLI tests with mocked sources."""
 from __future__ import annotations
 
-from pathlib import Path
-from unittest.mock import AsyncMock, patch
-
-import pytest
+from unittest.mock import patch
 
 from bibvet.cli import main as cli_main
 from bibvet.models import Author, CanonicalRecord, LookupKey
@@ -13,8 +10,6 @@ from bibvet.models import Author, CanonicalRecord, LookupKey
 def _patch_pipeline(records_for: dict[str, CanonicalRecord | None]):
     """Patch Pipeline._run_entry to return synthetic reports based on entry citekey."""
     from bibvet import pipeline as pipeline_mod
-
-    original = pipeline_mod.Pipeline._run_entry
 
     async def fake_run_entry(self, entry):
         from bibvet.compare import compare_entry

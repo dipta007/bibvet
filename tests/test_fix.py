@@ -2,7 +2,6 @@ from pathlib import Path
 
 import pytest
 
-from bibvet.compare import compare_entry
 from bibvet.fix import write_fixed_bib
 from bibvet.models import (
     Author,
