@@ -1,0 +1,32 @@
+import json
+from pathlib import Path
+
+from bibvet.models import (
+    Author, CanonicalRecord, EntryReport, FieldDiff, FileReport, LookupKey, UserEntry,
+)
+from bibvet.render.json import render_json
+
+
+def _entry(citekey="x", **f):
+    return UserEntry(citekey=citekey, entry_type="article", fields=f, source_file=Path("x.bib"), source_line=1)
+
+
+def test_returns_valid_json():
+    fr = FileReport(path=Path("a.bib"), entries=())
+    out = render_json([fr])
+    data = json.loads(out)
+    assert "files" in data
+
+
+def test_contains_entry_status_and_diffs():
+    diff = FieldDiff(field="year", user_value="2018", canonical_value="2017", severity="error", rationale="r")
+    er = EntryReport(
+        entry=_entry("bad"),
+        status="fixable", canonical=None, sources_consulted=(),
+        diffs=(diff,), paper_url="https://doi.org/10.1/x",
+    )
+    fr = FileReport(path=Path("a.bib"), entries=(er,))
+    data = json.loads(render_json([fr]))
+    assert data["files"][0]["entries"][0]["citekey"] == "bad"
+    assert data["files"][0]["entries"][0]["status"] == "fixable"
+    assert data["files"][0]["entries"][0]["diffs"][0]["field"] == "year"
