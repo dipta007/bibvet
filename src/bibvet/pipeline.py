@@ -23,6 +23,10 @@ from bibvet.resolve import resolve_lookup_keys
 from bibvet.sources.base import Source
 
 ProgressCallback = Callable[[UserEntry, EntryReport], None]
+FetchCallback = Callable[[UserEntry, str, str, bool], None]
+"""Called as on_fetch_done(entry, source_name, key_value, found).
+
+`found` is True if the source returned a record, False otherwise (miss or error)."""
 
 logger = logging.getLogger(__name__)
 
@@ -38,12 +42,14 @@ class Pipeline:
         lenient: bool = False,
         strict: bool = False,
         on_entry_done: ProgressCallback | None = None,
+        on_fetch_done: FetchCallback | None = None,
     ):
         self._sources = sources
         self._sem = asyncio.Semaphore(concurrency)
         self._lenient = lenient
         self._strict = strict
         self._on_entry_done = on_entry_done
+        self._on_fetch_done = on_fetch_done
 
     async def run(self, paths: list[Path]) -> list[FileReport]:
         return await asyncio.gather(*(self._run_file(p) for p in paths))
@@ -72,14 +78,19 @@ class Pipeline:
                 for source in self._sources:
                     if not source.supports(key):
                         continue
+                    rec: CanonicalRecord | None = None
                     try:
                         rec = await source.fetch(key)
                     except Exception as e:
                         errors.append(f"fetch error from {source.name}: {e}")
                         logger.warning("fetch error %s/%s: %s", source.name, key.value, e)
-                        continue
                     if rec is not None:
                         records.append(rec)
+                    if self._on_fetch_done is not None:
+                        try:
+                            self._on_fetch_done(entry, source.name, key.value, rec is not None)
+                        except Exception:
+                            logger.warning("fetch progress callback raised; ignoring", exc_info=True)
 
         report = compare_entry(entry, records, strict=self._strict)
         if errors and not records:

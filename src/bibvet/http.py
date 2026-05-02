@@ -9,12 +9,16 @@ from __future__ import annotations
 import asyncio
 import logging
 import random
+import sys
 from types import TracebackType
 from typing import Any
 
 import httpx
 
 logger = logging.getLogger(__name__)
+
+# Threshold above which we surface retries to stderr (per spec: don't spam for short waits).
+_NOTICE_WAIT_SEC = 4.0
 
 
 class TerminalNegative(Exception):
@@ -80,7 +84,7 @@ class HttpClient:
                 resp = await self._client.get(url, **kwargs)
             except (httpx.TransportError, httpx.TimeoutException) as e:
                 wait = self._next_wait(backoff, None)
-                logger.debug("network error %s on %s; retry in %.1fs", e, url, wait)
+                _notify_retry(url, f"network error: {type(e).__name__}", wait)
                 await asyncio.sleep(wait)
                 backoff = min(backoff * 2, self._max_backoff)
                 continue
@@ -91,7 +95,7 @@ class HttpClient:
                 raise TerminalNegative(resp.status_code, url)
             if resp.status_code in _RETRY_STATUSES:
                 wait = self._next_wait(backoff, resp.headers.get("Retry-After"))
-                logger.debug("got %s on %s; retry in %.1fs", resp.status_code, url, wait)
+                _notify_retry(url, f"http {resp.status_code}", wait)
                 await asyncio.sleep(wait)
                 backoff = min(backoff * 2, self._max_backoff)
                 continue
@@ -108,3 +112,11 @@ class HttpClient:
         if self._jitter > 0:
             return backoff * (1 + random.uniform(-self._jitter, self._jitter))
         return backoff
+
+
+def _notify_retry(url: str, reason: str, wait: float) -> None:
+    """Log retries always; surface to stderr only for long waits to avoid spam."""
+    logger.info("retrying %s in %.1fs (%s)", url, wait, reason)
+    if wait >= _NOTICE_WAIT_SEC:
+        host = url.split("/")[2] if "://" in url else url
+        print(f"  bibvet: {reason} on {host}, retrying in {wait:.0f}s", file=sys.stderr, flush=True)

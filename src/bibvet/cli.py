@@ -149,7 +149,10 @@ async def _run(paths: list[Path], args) -> int:
             counter = Pipeline(
                 sources=sources, lenient=args.lenient, strict=args.strict
             )
-            total = counter.total_entries(path_args)
+            total_entries = counter.total_entries(path_args)
+            # Rough estimate: each entry hits up to 3 sources times ~1.5 keys.
+            # Cache hits are also fetches (instant), so total includes cached calls.
+            total_fetches_est = max(total_entries * 4, 1)
             with Progress(
                 SpinnerColumn(),
                 TextColumn("[progress.description]{task.description}"),
@@ -159,16 +162,21 @@ async def _run(paths: list[Path], args) -> int:
                 console=progress_console,
                 transient=True,
             ) as progress:
-                task_id = progress.add_task("verifying citations", total=total)
+                entry_task = progress.add_task("entries verified", total=total_entries)
+                fetch_task = progress.add_task("api calls", total=total_fetches_est)
 
-                def _on_done(entry, report):
-                    progress.advance(task_id)
+                def _on_entry(entry, report):
+                    progress.advance(entry_task)
+
+                def _on_fetch(entry, source_name, key_value, found):
+                    progress.advance(fetch_task)
 
                 pipeline = Pipeline(
                     sources=sources,
                     lenient=args.lenient,
                     strict=args.strict,
-                    on_entry_done=_on_done,
+                    on_entry_done=_on_entry,
+                    on_fetch_done=_on_fetch,
                 )
                 file_reports = await pipeline.run(path_args)
         else:
