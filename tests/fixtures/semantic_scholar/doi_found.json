@@ -1,0 +1,12 @@
+{
+  "paperId": "204e3073870fae3d05bcbc2f6a8e263d9b72e776",
+  "externalIds": {"DOI": "10.5555/3295222.3295349", "ArXiv": "1706.03762"},
+  "title": "Attention Is All You Need",
+  "year": 2017,
+  "venue": "Neural Information Processing Systems",
+  "authors": [
+    {"name": "Ashish Vaswani"},
+    {"name": "Noam Shazeer"}
+  ],
+  "publicationTypes": ["Conference"]
+}
