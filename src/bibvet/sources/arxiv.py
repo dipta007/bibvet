@@ -13,15 +13,23 @@ from urllib.parse import urlencode
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
 from bibvet.normalize import fuzzy_ratio, title_match_score
+from bibvet.ratelimit import RateLimiter
 from bibvet.sources.base import Source
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
 BASE_URL = "http://export.arxiv.org/api/query"
 TITLE_MATCH_THRESHOLD = 90
+# arXiv asks for no more than 1 request every 3 seconds.
+# https://arxiv.org/help/api/user-manual
+ARXIV_MIN_INTERVAL = 3.0
 
 
 class ArxivSource(Source):
     name = "arxiv"
+
+    def __init__(self, http, cache):
+        super().__init__(http, cache)
+        self._rate_limiter = RateLimiter(ARXIV_MIN_INTERVAL)
 
     def supports(self, key: LookupKey) -> bool:
         return key.kind in ("arxiv", "title_query")
@@ -53,6 +61,7 @@ class ArxivSource(Source):
         else:
             query = f'ti:"{key.value}"'
             url = f"{BASE_URL}?{urlencode({'search_query': query, 'max_results': 5})}"
+        await self._rate_limiter.acquire()
         resp = await self.http.get(url)
         return resp.text
 

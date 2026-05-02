@@ -14,15 +14,28 @@ from urllib.parse import quote, urlencode
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
 from bibvet.normalize import fuzzy_ratio, normalize_doi, title_match_score
+from bibvet.ratelimit import RateLimiter
 from bibvet.sources.base import Source
 
 BASE = "https://api.semanticscholar.org/graph/v1/paper"
 FIELDS = "title,year,venue,authors,externalIds,publicationTypes"
 TITLE_MATCH_THRESHOLD = 90
+# Unauthenticated S2 allows ~100/5min = 1 per 3s. With API key, much higher.
+S2_MIN_INTERVAL_NO_KEY = 1.0
+S2_MIN_INTERVAL_WITH_KEY = 0.05
 
 
 class SemanticScholarSource(Source):
     name = "semantic_scholar"
+
+    def __init__(self, http, cache):
+        super().__init__(http, cache)
+        interval = (
+            S2_MIN_INTERVAL_WITH_KEY
+            if os.environ.get("SEMANTIC_SCHOLAR_API_KEY")
+            else S2_MIN_INTERVAL_NO_KEY
+        )
+        self._rate_limiter = RateLimiter(interval)
 
     def supports(self, key: LookupKey) -> bool:
         return key.kind in ("doi", "arxiv", "title_query")
@@ -60,6 +73,7 @@ class SemanticScholarSource(Source):
             url = f"{BASE}/arXiv:{quote(key.value, safe='')}?fields={FIELDS}"
         else:
             url = f"{BASE}/search?{urlencode({'query': key.value, 'limit': 5, 'fields': FIELDS})}"
+        await self._rate_limiter.acquire()
         resp = await self.http.get(url, headers=self._headers())
         return resp.json()
 

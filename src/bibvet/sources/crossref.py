@@ -13,14 +13,21 @@ from urllib.parse import quote, urlencode
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
 from bibvet.normalize import fuzzy_ratio, normalize_doi, title_match_score
+from bibvet.ratelimit import RateLimiter
 from bibvet.sources.base import Source
 
 BASE = "https://api.crossref.org/works"
 TITLE_MATCH_THRESHOLD = 90
+# CrossRef public pool is generous; throttle just enough to avoid bursts.
+CROSSREF_MIN_INTERVAL = 0.1
 
 
 class CrossRefSource(Source):
     name = "crossref"
+
+    def __init__(self, http, cache):
+        super().__init__(http, cache)
+        self._rate_limiter = RateLimiter(CROSSREF_MIN_INTERVAL)
 
     def supports(self, key: LookupKey) -> bool:
         return key.kind in ("doi", "title_query")
@@ -56,6 +63,7 @@ class CrossRefSource(Source):
             if mailto:
                 params["mailto"] = mailto
             url = f"{BASE}?{urlencode(params)}"
+        await self._rate_limiter.acquire()
         resp = await self.http.get(url)
         return resp.json()
 
