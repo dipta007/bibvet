@@ -91,6 +91,14 @@ def _build_parser() -> argparse.ArgumentParser:
         action="store_true",
         help="promote warnings to errors and flag single-source matches",
     )
+    p.add_argument(
+        "--skip-source",
+        action="append",
+        default=[],
+        choices=["crossref", "semantic_scholar", "arxiv"],
+        metavar="SOURCE",
+        help="skip a source (repeatable). Useful when one is rate-limiting you.",
+    )
     p.add_argument("--no-cache", action="store_true", help="bypass the disk cache")
     p.add_argument("--debug", action="store_true", help="show full tracebacks on errors")
     return p
@@ -125,8 +133,17 @@ def _collect_paths(inputs: list[str], *, recursive: bool) -> list[Path]:
 
 async def _run(paths: list[Path], args) -> int:
     cache = _make_cache(args)
+    skip = set(args.skip_source)
     async with HttpClient() as http:
-        sources = [CrossRefSource(http, cache), SemanticScholarSource(http, cache), ArxivSource(http, cache)]
+        all_sources = {
+            "crossref": CrossRefSource(http, cache),
+            "semantic_scholar": SemanticScholarSource(http, cache),
+            "arxiv": ArxivSource(http, cache),
+        }
+        sources = [s for name, s in all_sources.items() if name not in skip]
+        if not sources:
+            print("bibvet: no sources enabled (all skipped)", file=sys.stderr)
+            return 2
         for s in sources:
             s.http = http
         path_args = await _resolve_stdin(paths)

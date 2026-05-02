@@ -20,7 +20,9 @@ def source(tmp_path):
 
 def test_supports_arxiv_keys(source):
     assert source.supports(LookupKey(kind="arxiv", value="1706.03762"))
-    assert source.supports(LookupKey(kind="title_query", value="x"))
+    # arXiv title-search is intentionally not used: weaker than S2/CrossRef
+    # and aggressively rate-limited.
+    assert not source.supports(LookupKey(kind="title_query", value="x"))
     assert not source.supports(LookupKey(kind="doi", value="10.1/x"))
 
 

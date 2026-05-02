@@ -32,7 +32,10 @@ class ArxivSource(Source):
         self._rate_limiter = RateLimiter(ARXIV_MIN_INTERVAL)
 
     def supports(self, key: LookupKey) -> bool:
-        return key.kind in ("arxiv", "title_query")
+        # Only handle direct arXiv-ID lookups. Title-search via arXiv is slower,
+        # less authoritative than CrossRef/Semantic Scholar, and aggressively
+        # rate-limited; we skip it.
+        return key.kind == "arxiv"
 
     async def fetch(self, key: LookupKey) -> CanonicalRecord | None:
         cache_key = f"{key.kind}:{key.value}"
