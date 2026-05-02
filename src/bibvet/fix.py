@@ -12,10 +12,10 @@ from pathlib import Path
 from bibvet.models import CanonicalRecord, EntryReport, FileReport, UserEntry
 
 REQUIRED_FIELDS = {
-    "article": ["author", "title", "journal", "year", "volume", "number", "pages", "doi"],
-    "inproceedings": ["author", "title", "booktitle", "year", "pages", "doi"],
-    "conference": ["author", "title", "booktitle", "year", "pages", "doi"],
-    "incollection": ["author", "title", "booktitle", "publisher", "year", "pages", "doi"],
+    "article": ["author", "title", "journal", "year", "doi"],
+    "inproceedings": ["author", "title", "booktitle", "year", "doi"],
+    "conference": ["author", "title", "booktitle", "year", "doi"],
+    "incollection": ["author", "title", "booktitle", "publisher", "year", "doi"],
     "book": ["author", "title", "publisher", "year"],
     "phdthesis": ["author", "title", "school", "year"],
     "mastersthesis": ["author", "title", "school", "year"],

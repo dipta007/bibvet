@@ -309,16 +309,13 @@ def test_misc_with_arxiv_eprint_preserves_misc_type_after_fix(tmp_path):
 
 
 # ---------------------------------------------------------------------------
-# User-supplied pages field is kept when canonical has none
+# Unverified fields (pages, volume, number) are dropped from --fix output
 # ---------------------------------------------------------------------------
 
-def test_fixable_entry_keeps_user_supplied_pages(tmp_path):
-    """When canonical has no pages but user supplied them, pages survive the fix.
-
-    REQUIRED_FIELDS['inproceedings'] includes 'pages'.  _rewrite_with_canonical
-    falls back to entry.fields[k] when k is not present in canonical values →
-    user's pages value is preserved.
-    """
+def test_fixable_entry_drops_unverified_pages_volume_number(tmp_path):
+    """We do not verify pages / volume / number against any source, so passing
+    them through the fix would carry forward potentially hallucinated values.
+    They should be dropped, leaving only fields we can vouch for."""
     entry = _entry(
         "paper", entry_type="inproceedings",
         title="Old Title",
@@ -327,7 +324,6 @@ def test_fixable_entry_keeps_user_supplied_pages(tmp_path):
         booktitle="Old Conf",
         pages="5998--6008",
     )
-    # Canonical has no pages field (no venue-supplied page range)
     canonical = CanonicalRecord(
         source="crossref",
         matched_via=LookupKey(kind="doi", value="10.1/paper"),
@@ -348,5 +344,7 @@ def test_fixable_entry_keeps_user_supplied_pages(tmp_path):
     write_fixed_bib(fr, out, original_text=_render_input(fr))
 
     text = out.read_text()
-    assert "5998--6008" in text, "user-supplied pages must be preserved in fixed output"
     assert "Correct Title" in text
+    # Unverified fields must not appear in the fixed output
+    assert "5998--6008" not in text, "pages must be dropped — we don't verify them"
+    assert "pages" not in text
