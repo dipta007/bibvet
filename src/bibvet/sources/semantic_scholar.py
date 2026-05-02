@@ -13,7 +13,7 @@ from urllib.parse import quote, urlencode
 
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
-from bibvet.normalize import fuzzy_ratio, normalize_doi
+from bibvet.normalize import fuzzy_ratio, normalize_doi, title_match_score
 from bibvet.sources.base import Source
 
 BASE = "https://api.semanticscholar.org/graph/v1/paper"
@@ -72,7 +72,15 @@ def _select(data: dict, key: LookupKey) -> dict | None:
     items = data.get("data", []) or []
     if not items:
         return None
-    best = max(items, key=lambda it: fuzzy_ratio(it.get("title", ""), key.value))
+
+    def _score(it: dict) -> int:
+        title = it.get("title", "")
+        year = int(it.get("year") or 0)
+        authors = it.get("authors") or []
+        first_family = _split_name(authors[0].get("name", ""))[0] if authors else ""
+        return title_match_score(title, year, first_family, key.value, key.extras)
+
+    best = max(items, key=_score)
     if fuzzy_ratio(best.get("title", ""), key.value) < TITLE_MATCH_THRESHOLD:
         return None
     return best

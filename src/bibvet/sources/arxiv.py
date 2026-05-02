@@ -12,7 +12,7 @@ from urllib.parse import urlencode
 
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
-from bibvet.normalize import fuzzy_ratio
+from bibvet.normalize import fuzzy_ratio, title_match_score
 from bibvet.sources.base import Source
 
 ATOM_NS = "{http://www.w3.org/2005/Atom}"
@@ -109,7 +109,12 @@ def _pick(candidates: list[dict], key: LookupKey) -> dict | None:
         return None
     if key.kind == "arxiv":
         return candidates[0]
-    best = max(candidates, key=lambda c: fuzzy_ratio(c["title"], key.value))
+
+    def _score(c: dict) -> int:
+        first_family = c["authors"][0]["family"] if c.get("authors") else ""
+        return title_match_score(c["title"], c.get("year") or 0, first_family, key.value, key.extras)
+
+    best = max(candidates, key=_score)
     if fuzzy_ratio(best["title"], key.value) < TITLE_MATCH_THRESHOLD:
         return None
     return best

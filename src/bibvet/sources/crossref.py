@@ -12,7 +12,7 @@ from urllib.parse import quote, urlencode
 
 from bibvet.http import TerminalNegative
 from bibvet.models import Author, CanonicalRecord, LookupKey
-from bibvet.normalize import fuzzy_ratio, normalize_doi
+from bibvet.normalize import fuzzy_ratio, normalize_doi, title_match_score
 from bibvet.sources.base import Source
 
 BASE = "https://api.crossref.org/works"
@@ -51,7 +51,7 @@ class CrossRefSource(Source):
         if key.kind == "doi":
             url = f"{BASE}/{quote(key.value, safe='')}"
         else:
-            params = {"query.bibliographic": key.value, "rows": 5}
+            params = {"query.bibliographic": key.value, "rows": 20}
             mailto = os.environ.get("CROSSREF_MAILTO")
             if mailto:
                 params["mailto"] = mailto
@@ -66,10 +66,15 @@ def _select(data: dict, key: LookupKey) -> dict | None:
     items = data.get("message", {}).get("items", []) or []
     if not items:
         return None
-    best = max(
-        items,
-        key=lambda it: fuzzy_ratio(_first(it.get("title")), key.value),
-    )
+
+    def _score(it: dict) -> int:
+        title = _first(it.get("title"))
+        year = _extract_year(it)
+        authors = it.get("author") or []
+        first_family = authors[0].get("family", "") if authors else ""
+        return title_match_score(title, year, first_family, key.value, key.extras)
+
+    best = max(items, key=_score)
     if fuzzy_ratio(_first(best.get("title")), key.value) < TITLE_MATCH_THRESHOLD:
         return None
     return best
@@ -83,9 +88,17 @@ def _first(xs):
     return xs
 
 
-def _to_dict(msg: dict) -> dict:
+def _extract_year(msg: dict) -> int:
     issued = msg.get("issued", {}).get("date-parts") or [[0]]
-    year = int(issued[0][0]) if issued and issued[0] else 0
+    raw = issued[0][0] if issued and issued[0] else 0
+    try:
+        return int(raw) if raw is not None else 0
+    except (TypeError, ValueError):
+        return 0
+
+
+def _to_dict(msg: dict) -> dict:
+    year = _extract_year(msg)
     return {
         "doi": msg.get("DOI", "").lower() or None,
         "title": _first(msg.get("title")),

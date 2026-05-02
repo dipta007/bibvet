@@ -69,6 +69,39 @@ def fuzzy_ratio(a: str, b: str) -> int:
     return int(fuzz.token_set_ratio(normalize_string(a), normalize_string(b)))
 
 
+def title_match_score(
+    candidate_title: str,
+    candidate_year: int,
+    candidate_first_author_family: str,
+    query_title: str,
+    extras: dict,
+) -> int:
+    """Composite score for picking the best title-search candidate.
+
+    Pure title fuzzy_ratio is insufficient when papers share token sets
+    (e.g. 'Attention Is All You Need' vs 'Is Attention All You Need?'). This
+    adds bonuses for year and author proximity, and a heavy penalty for
+    candidates whose year is far from the expected year.
+    """
+    score = fuzzy_ratio(candidate_title, query_title)
+    expected_year = extras.get("year") or 0
+    if expected_year and candidate_year:
+        diff = abs(int(candidate_year) - int(expected_year))
+        if diff == 0:
+            score += 50
+        elif diff <= 2:
+            score += 30
+        elif diff <= 5:
+            score += 10
+        else:
+            score -= 50  # likely a different paper with a similar title
+    expected_author = extras.get("first_author") or ""
+    if expected_author and candidate_first_author_family:
+        if normalize_string(candidate_first_author_family) == expected_author:
+            score += 30
+    return score
+
+
 def normalize_doi(doi: str) -> str:
     """Canonical DOI form: lowercase, no scheme, no `doi:` prefix, no whitespace."""
     s = doi.strip().lower()

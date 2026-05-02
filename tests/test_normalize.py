@@ -3,6 +3,7 @@ from bibvet.normalize import (
     normalize_doi,
     normalize_string,
     strip_latex,
+    title_match_score,
 )
 
 
@@ -63,6 +64,57 @@ class TestFuzzyRatio:
     def test_normalizes_inputs(self):
         # Already-normalized vs LaTeX form should still score 100
         assert fuzzy_ratio(r"{BERT}: Pre-training", "bert pre training") >= 95
+
+
+class TestTitleMatchScore:
+    def test_exact_year_and_author_beats_year_only(self):
+        # Two same-title candidates; only year+author proximity differentiates.
+        right = title_match_score(
+            "Attention Is All You Need", 2017, "Vaswani",
+            "attention is all you need",
+            extras={"year": 2017, "first_author": "vaswani"},
+        )
+        wrong_year = title_match_score(
+            "Attention Is All You Need", 2025, "Mineault",
+            "attention is all you need",
+            extras={"year": 2017, "first_author": "vaswani"},
+        )
+        assert right > wrong_year
+
+    def test_year_far_off_gets_penalty(self):
+        far_off = title_match_score(
+            "Attention Is All You Need", 2099, "Anyone",
+            "attention is all you need",
+            extras={"year": 2017},
+        )
+        spot_on = title_match_score(
+            "Attention Is All You Need", 2017, "Anyone",
+            "attention is all you need",
+            extras={"year": 2017},
+        )
+        assert spot_on - far_off >= 80  # 50 bonus + 50 penalty
+
+    def test_no_extras_falls_back_to_title_only(self):
+        score = title_match_score(
+            "Attention Is All You Need", 2017, "Vaswani",
+            "attention is all you need",
+            extras={},
+        )
+        assert score == fuzzy_ratio("Attention Is All You Need", "attention is all you need")
+
+    def test_token_set_collision_resolved_by_year(self):
+        # Both have identical token sets after normalization, so fuzzy_ratio == 100 for both
+        right = title_match_score(
+            "Attention Is All You Need", 2017, "Vaswani",
+            "attention is all you need",
+            extras={"year": 2017, "first_author": "vaswani"},
+        )
+        collision = title_match_score(
+            "Is Attention All You Need", 2025, "Mineault",
+            "attention is all you need",
+            extras={"year": 2017, "first_author": "vaswani"},
+        )
+        assert right > collision
 
 
 class TestNormalizeDoi:
