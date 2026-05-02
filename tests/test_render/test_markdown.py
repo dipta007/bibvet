@@ -34,3 +34,54 @@ def test_renders_diffs_in_problem_entries():
     assert "2018" in md
     assert "2017" in md
     assert "https://doi.org/10.1/x" in md
+
+
+def test_paper_url_is_an_autolink():
+    er = EntryReport(
+        entry=_entry("p", title="T"),
+        status="fixable", canonical=None, sources_consulted=(), diffs=(),
+        paper_url="https://doi.org/10.5555/3295222.3295349",
+    )
+    fr = FileReport(path=Path("a.bib"), entries=(er,))
+    md = render_markdown([fr])
+    # CommonMark autolink: <URL> is rendered as a clickable link in every renderer.
+    assert "<https://doi.org/10.5555/3295222.3295349>" in md
+
+
+def test_doi_diff_value_is_a_clickable_link():
+    diff = FieldDiff(
+        field="doi",
+        user_value="10.1234/fake",
+        canonical_value="10.5555/3295222.3295349",
+        severity="error",
+        rationale="DOI does not match",
+    )
+    er = EntryReport(
+        entry=_entry("p"),
+        status="fixable", canonical=None, sources_consulted=(),
+        diffs=(diff,), paper_url=None,
+    )
+    fr = FileReport(path=Path("a.bib"), entries=(er,))
+    md = render_markdown([fr])
+    # Both the wrong and the canonical DOI should be clickable.
+    assert "[`10.1234/fake`](https://doi.org/10.1234/fake)" in md
+    assert "[`10.5555/3295222.3295349`](https://doi.org/10.5555/3295222.3295349)" in md
+
+
+def test_doi_with_url_prefix_is_normalized_in_link_target():
+    diff = FieldDiff(
+        field="doi",
+        user_value="https://doi.org/10.1234/abc",
+        canonical_value="10.1234/abc",
+        severity="error",
+        rationale="r",
+    )
+    er = EntryReport(
+        entry=_entry("p"),
+        status="fixable", canonical=None, sources_consulted=(),
+        diffs=(diff,), paper_url=None,
+    )
+    fr = FileReport(path=Path("a.bib"), entries=(er,))
+    md = render_markdown([fr])
+    # Display preserves the user's exact text, but the link URL is canonical.
+    assert "[`https://doi.org/10.1234/abc`](https://doi.org/10.1234/abc)" in md

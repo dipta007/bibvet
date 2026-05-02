@@ -4,6 +4,7 @@ from __future__ import annotations
 from collections import Counter
 
 from bibvet.models import EntryReport, FileReport
+from bibvet.normalize import normalize_doi
 
 STATUS_ORDER = ["fixable", "cross_check_failed", "unverified", "verified", "skipped"]
 
@@ -47,13 +48,27 @@ def _summary_line(n: int, statuses: Counter) -> str:
 
 
 def _entry_block(er: EntryReport) -> str:
-    out = [f"- **`{er.entry.citekey}`** ({er.entry.source_file}:{er.entry.source_line})"]
+    out = [f"- **`{er.entry.citekey}`** (`{er.entry.source_file}:{er.entry.source_line}`)"]
     if er.paper_url:
-        out.append(f"  - {er.paper_url}")
+        out.append(f"  - <{er.paper_url}>")
     if er.canonical and er.canonical.venue:
         out.append(f"  - venue: {er.canonical.venue} ({er.canonical.year})")
     for d in er.diffs:
-        out.append(f"  - **{d.severity}** `{d.field}`: `{d.user_value}` → `{d.canonical_value}` ({d.rationale})")
+        user_disp = _format_value(d.field, d.user_value)
+        canonical_disp = _format_value(d.field, d.canonical_value)
+        out.append(
+            f"  - **{d.severity}** `{d.field}`: {user_disp} → {canonical_disp} ({d.rationale})"
+        )
     for note in er.notes:
         out.append(f"  - _note:_ {note}")
     return "\n".join(out)
+
+
+def _format_value(field: str, value: str) -> str:
+    """Render a diff value: DOIs become clickable links, other fields stay as code."""
+    if not value:
+        return "`<empty>`"
+    if field == "doi":
+        normalized = normalize_doi(value)
+        return f"[`{value}`](https://doi.org/{normalized})"
+    return f"`{value}`"
