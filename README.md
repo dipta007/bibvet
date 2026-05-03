@@ -95,8 +95,22 @@ Slightly more false positives, but won't miss subtly altered citations.
 
 bibvet works with no config. Optional environment variables:
 
-- `SEMANTIC_SCHOLAR_API_KEY` — higher quota for Semantic Scholar
+- `SEMANTIC_SCHOLAR_API_KEY` — higher quota for Semantic Scholar (1 req / 50ms vs. 1 req / second without)
 - `CROSSREF_MAILTO` — opts into CrossRef's polite pool
+
+### Getting a Semantic Scholar API key
+
+If you're verifying more than a few dozen entries, the unauthenticated rate limit (~100 requests / 5 min) will throttle you. The key is free.
+
+1. Go to <https://www.semanticscholar.org/product/api#api-key-form> and request a key.
+2. Approval typically takes a few business days; they email you the key.
+3. Set it in your shell:
+
+   ```bash
+   export SEMANTIC_SCHOLAR_API_KEY=sk-...
+   ```
+
+   Or persist it in `~/.zshrc` / `~/.bashrc`. bibvet picks it up automatically — no flags needed.
 
 Cache lives at the platform-default user cache directory (`~/Library/Caches/bibvet/` on macOS, `~/.cache/bibvet/` on Linux). 30-day TTL. `bibvet cache clear` to purge.
 
